@@ -12,6 +12,8 @@ services:
     # port mapping localhostmachine:container
     ports:
       - "5432:5432"
+    # Add container name so that Docker doesn't add current folder prefix to service name
+    container_name: pgdatabase
   pgadmin:
     image: dpage/pgadmin4
     environment:
@@ -19,4 +21,5 @@ services:
       - PGADMIN_DEFAULT_PASSWORD=root
     ports:
       - "8080:80"
+    container_name: pgadmin
     
