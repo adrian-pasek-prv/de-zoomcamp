@@ -14,6 +14,9 @@ services:
       - "5432:5432"
     # Add container name so that Docker doesn't add current folder prefix to service name
     container_name: pgdatabase
+    # Specify network on which this container should work on
+    networks:
+      - pgnetwork
   pgadmin:
     image: dpage/pgadmin4
     environment:
@@ -24,4 +27,10 @@ services:
     ports:
       - "8080:80"
     container_name: pgadmin
+    networks:
+      - pgnetwork
+# Specify a network name instead of using project_name_default name
+networks:
+  pgnetwork:
+    name: pgnetwork
     
