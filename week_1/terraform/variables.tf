@@ -4,6 +4,7 @@ locals { # Constant values
 
 variable "project" {
   description = "Your GCP Project ID"
+  default = "elite-wonder-373712" # Unique ID of the project
 }
 
 variable "region" {
