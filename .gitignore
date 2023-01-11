@@ -131,3 +131,7 @@ dmypy.json
 # Files
 *.csv
 *.gz
+
+# Terraform generated files
+.terraform.lock.hcl
+.terraform/
