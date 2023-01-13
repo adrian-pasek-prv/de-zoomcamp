@@ -137,4 +137,4 @@ dmypy.json
 *terraform.*
 
 # Airflow logs
-*airflow/logs/
+logs/
