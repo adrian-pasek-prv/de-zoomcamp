@@ -135,3 +135,6 @@ dmypy.json
 # Terraform generated files
 .terraform/
 *terraform.*
+
+# Airflow logs
+*airflow/logs/
