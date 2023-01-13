@@ -1,2 +1,2 @@
-apache-airflow-providers-google
-pyarrow
+apache-airflow-providers-google # Google specific client for Airflow
+pyarrow # used to convert data into parquet files
