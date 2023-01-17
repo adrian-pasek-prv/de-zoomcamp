@@ -1,4 +1,5 @@
 import os
+from datetime import datetime
 
 from airflow.decorators import dag, task
 from airflow.utils.dates import days_ago
@@ -14,31 +15,36 @@ PROJECT_ID = os.environ.get("GCP_PROJECT_ID")
 BUCKET = os.environ.get("GCP_GCS_BUCKET")
 BIGQUERY_DATASET = os.environ.get("BIGQUERY_DATASET")
 
-dataset_file = "yellow_tripdata_2021-01.csv.gz"
-dataset_url = f"https://github.com/DataTalksClub/nyc-tlc-data/releases/download/yellow/{dataset_file}"
-path_to_local_home = os.environ.get("AIRFLOW_HOME")
+URL_PREFIX = 'https://github.com/DataTalksClub/nyc-tlc-data/releases/download/yellow/'
+# Airflow makes use of Jinja so we can access "logical_date" (execution_date) variable and format it to YYYY-MM format
+# in order to make this job dynamic
+DOWNLOAD_FILENAME = 'yellow_tripdata_{{ logical_date.strftime(\'%Y-%m\') }}.csv.gz'
+URL_TEMPLATE = URL_PREFIX + DOWNLOAD_FILENAME
+PATH_TO_LOCAL_HOME = os.environ.get("AIRFLOW_HOME")
+
+
 
 
 default_args = {
     "owner": "airflow",
-    "start_date": days_ago(1),
-    "depends_on_past": False,
+    "start_date": datetime(2021, 1, 1),
+    "end_date": datetime(2021, 8, 2),
+    "depends_on_past": True,
     "retries": 1,
 }
 
 @dag(
     dag_id="data_ingestion_gcs_dag",
-    schedule_interval="@daily",
+    schedule_interval="0 6 2 * *",
     default_args=default_args,
-    catchup=False,
-    max_active_runs=1,
+    catchup=True,
     tags=['dtc-de'],
 )
 def data_ingestion_gcs_dag():
 
     # Not all operators can be used with @task decorator, thus they are used in classic manner
     download_dataset = BashOperator(task_id='download_dataset',
-                                    bash_command=f"curl -sSL {dataset_url} > {path_to_local_home}/{dataset_file}"
+                                    bash_command=f'curl -sSL {URL_TEMPLATE} > {PATH_TO_LOCAL_HOME}/{DOWNLOAD_FILENAME}'
     )
 
     @task(task_id='format_to_parquet', )
@@ -50,7 +56,7 @@ def data_ingestion_gcs_dag():
         return parquet_file_name
 
     # We have assigned a decorated task to a variable in order to add arguments
-    format_to_parquet = format_to_parquet_func(src_file=f"{path_to_local_home}/{dataset_file}")
+    format_to_parquet = format_to_parquet_func(src_file=f"{PATH_TO_LOCAL_HOME}/{DOWNLOAD_FILENAME}")
 
     @task(task_id='upload_to_gcs')
     # NOTE: takes 20 mins, at an upload speed of 800kbps. Faster if your internet has a better upload speed
@@ -79,7 +85,7 @@ def data_ingestion_gcs_dag():
     # format_to_parquet variable is the returned string from decorated task format_to_parquet_func
     upload_to_gcs = upload_to_gcs_func(bucket=BUCKET,
                                        object_name=f"raw/{format_to_parquet}",
-                                       local_file=f"{path_to_local_home}/{format_to_parquet}",)
+                                       local_file=f"{PATH_TO_LOCAL_HOME}/{format_to_parquet}",)
 
     bigquery_external_table_insert = BigQueryCreateExternalTableOperator(
         task_id="bigquery_external_table_insert",
