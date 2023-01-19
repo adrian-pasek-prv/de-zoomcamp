@@ -14,6 +14,7 @@ import pandas as pd
 PROJECT_ID = os.environ.get("GCP_PROJECT_ID")
 BUCKET = os.environ.get("GCP_GCS_BUCKET")
 BIGQUERY_DATASET = os.environ.get("BIGQUERY_DATASET")
+EXT_TABLE_NAME = 'ext_yellow_taxi'
 
 URL_PREFIX = 'https://github.com/DataTalksClub/nyc-tlc-data/releases/download/yellow/'
 # Airflow makes use of Jinja so we can access "logical_date" (execution_date) variable and format it to YYYY-MM format
@@ -50,7 +51,36 @@ def data_ingestion_gcs_dag():
     @task(task_id='format_to_parquet', )
     def format_to_parquet_func(src_file):
 
-        df = pd.read_csv(src_file)
+# Using "Int64" not int64, allows integers to be nullable in Pandas
+# ref: https://stackoverflow.com/questions/11548005/numpy-or-pandas-keeping-array-type-as-integer-while-having-a-nan-value
+# Datetime columns are first assigned a string and then a date_parser is used
+# Parquet file will retain column datatypes as assigned in Pandas DataFrame
+
+        schema = {
+            "VendorID": "Int64",
+            "tpep_pickup_datetime": "str",
+            "tpep_dropoff_datetime": "str",
+            "passenger_count": "Int64",
+            "trip_distance": "float32",
+            "RatecodeID": "Int64",
+            "store_and_fwd_flag": "str",
+            "PULocationID": "Int64",
+            "DOLocationID": "Int64",
+            "payment_type": "Int64",
+            "fare_amount": "float32",
+            "extra": "float32",
+            "mta_tax": "float32",
+            "tip_amount": "float32",
+            "tolls_amount": "float32",
+            "improvement_surcharge": "float32",
+            "total_amount": "float32",
+            "congestion_surcharge": "float32",
+        }
+
+        df = pd.read_csv(src_file, 
+                         dtype=schema,
+                         parse_dates=["tpep_pickup_datetime", "tpep_dropoff_datetime"],
+                         date_parser=pd.to_datetime)
         parquet_file_name = src_file.replace('.csv.gz', '.parquet').split('/')[-1]
         df.to_parquet(src_file.replace('.csv.gz', '.parquet'))
         return parquet_file_name
@@ -84,26 +114,27 @@ def data_ingestion_gcs_dag():
 
     # format_to_parquet variable is the returned string from decorated task format_to_parquet_func
     upload_to_gcs = upload_to_gcs_func(bucket=BUCKET,
-                                       object_name=f"raw/{format_to_parquet}",
+                                       object_name=f"raw/yellow_taxi/{format_to_parquet}",
                                        local_file=f"{PATH_TO_LOCAL_HOME}/{format_to_parquet}",)
 
-    bigquery_external_table_insert = BigQueryCreateExternalTableOperator(
-        task_id="bigquery_external_table_insert",
+    bigquery_create_external_table = BigQueryCreateExternalTableOperator(
+        task_id="bigquery_create_external_table",
         table_resource={
             "tableReference": {
                 "projectId": PROJECT_ID,
                 "datasetId": BIGQUERY_DATASET,
-                "tableId": "external_table",
+                "tableId": EXT_TABLE_NAME,
             },
             "externalDataConfiguration": {
                 "sourceFormat": "PARQUET",
-                "sourceUris": [f"gs://{BUCKET}/raw/{format_to_parquet}"],
+                # Specify source of this external table. Using wildcard to fetch data from all parquet files in this directory
+                "sourceUris": [f"gs://{BUCKET}/raw/yellow_taxi/*.parquet"],
             },
-        },
+        }
     )
 
     # If we explicitly assigned each task to a variable we can use bitwise operators to create DAGs.
-    download_dataset >> format_to_parquet >> upload_to_gcs >> bigquery_external_table_insert
+    download_dataset >> format_to_parquet >> upload_to_gcs >> bigquery_create_external_table
 
 # We call the main DAG function at the end for it to work
 data_ingestion_gcs_dag()
