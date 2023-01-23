@@ -28,7 +28,7 @@ PATH_TO_LOCAL_HOME = os.environ.get("AIRFLOW_HOME")
 
 default_args = {
     "owner": "airflow",
-    "start_date": datetime(2021, 1, 1),
+    "start_date": datetime(2019, 1, 1),
     "end_date": datetime(2021, 8, 2),
     "depends_on_past": True,
     "retries": 1,
