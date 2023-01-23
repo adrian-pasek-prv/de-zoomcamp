@@ -22,8 +22,7 @@ URL_PREFIX = 'https://github.com/DataTalksClub/nyc-tlc-data/releases/download/ye
 DOWNLOAD_FILENAME = 'yellow_tripdata_{{ logical_date.strftime(\'%Y-%m\') }}.csv.gz'
 URL_TEMPLATE = URL_PREFIX + DOWNLOAD_FILENAME
 PATH_TO_LOCAL_HOME = os.environ.get("AIRFLOW_HOME")
-
-
+GCS_PATH_TEMPLATE = 'raw/yellow_tripdata/'
 
 
 default_args = {
@@ -114,7 +113,7 @@ def data_ingestion_gcs_dag():
 
     # format_to_parquet variable is the returned string from decorated task format_to_parquet_func
     upload_to_gcs = upload_to_gcs_func(bucket=BUCKET,
-                                       object_name=f"raw/yellow_taxi/{format_to_parquet}",
+                                       object_name=f"{GCS_PATH_TEMPLATE}{format_to_parquet}",
                                        local_file=f"{PATH_TO_LOCAL_HOME}/{format_to_parquet}",)
 
     bigquery_create_external_table = BigQueryCreateExternalTableOperator(
@@ -128,9 +127,15 @@ def data_ingestion_gcs_dag():
             "externalDataConfiguration": {
                 "sourceFormat": "PARQUET",
                 # Specify source of this external table. Using wildcard to fetch data from all parquet files in this directory
-                "sourceUris": [f"gs://{BUCKET}/raw/yellow_taxi/*.parquet"],
+                "sourceUris": [f"gs://{BUCKET}/{GCS_PATH_TEMPLATE}*.parquet"],
             },
         }
+    )
+
+    # Remove downloaded files .csv.gz and .parquet to keep memory clean
+    remove_temp_files = BashOperator(
+        task_id='remove_temp_files',
+        bash_command=f'rm {PATH_TO_LOCAL_HOME}/{DOWNLOAD_FILENAME} {PATH_TO_LOCAL_HOME}/{format_to_parquet}'
     )
 
     # If we explicitly assigned each task to a variable we can use bitwise operators to create DAGs.
