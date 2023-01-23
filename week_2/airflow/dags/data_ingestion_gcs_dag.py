@@ -45,7 +45,7 @@ def data_ingestion_gcs_dag():
 
     # Not all operators can be used with @task decorator, thus they are used in classic manner
     download_dataset = BashOperator(task_id='download_dataset',
-                                    bash_command=f'curl -sSL {URL_TEMPLATE} > {PATH_TO_LOCAL_HOME}/{DOWNLOAD_FILENAME}'
+                                    bash_command=f'curl -sSLf {URL_TEMPLATE} > {PATH_TO_LOCAL_HOME}/{DOWNLOAD_FILENAME}'
     )
 
     @task(task_id='format_to_parquet', )
