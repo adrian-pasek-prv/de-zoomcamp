@@ -21,7 +21,8 @@ def dag_template(
     url_prefix: str,
     download_filename_prefix: str,
     gcs_path_template: str,
-    date_columns_for_parsing: list
+    # Won't use date parsing for now, it's slow with pandas
+    # date_columns_for_parsing: list
 ):
     '''
     DAG template that allows to customize what files should be downloaded (only .csv.gz),
@@ -61,9 +62,9 @@ def dag_template(
     # Datetime columns are first assigned a string and then a date_parser is used
     # Parquet file will retain column datatypes as assigned in Pandas DataFrame
 
-            df = pd.read_csv(src_file, 
-                            parse_dates=date_columns_for_parsing,
-                            date_parser=pd.to_datetime)
+            df = pd.read_csv(src_file) 
+                            # parse_dates=date_columns_for_parsing,
+                            # date_parser=pd.to_datetime)
             parquet_file_name = src_file.replace('.csv.gz', '.parquet').split('/')[-1]
             df.to_parquet(src_file.replace('.csv.gz', '.parquet'))
             return parquet_file_name
