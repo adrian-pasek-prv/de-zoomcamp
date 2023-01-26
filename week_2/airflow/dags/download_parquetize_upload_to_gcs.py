@@ -7,7 +7,8 @@ from airflow.operators.bash import BashOperator
 
 from google.cloud import storage  # This was specified in Dockerfile
 
-import pandas as pd
+import pyarrow.csv as pa_csv
+import pyarrow.parquet as pa_parquet
 
 # Import enviroment variable within context of Docker image from Dockerfile
 PROJECT_ID = os.environ.get("GCP_PROJECT_ID")
@@ -55,26 +56,30 @@ def dag_template(
         )
 
         @task(task_id='format_to_parquet', )
-        def format_to_parquet_func(src_file):
+        def format_to_parquet(src_file):
 
     # Using "Int64" not int64, allows integers to be nullable in Pandas
     # ref: https://stackoverflow.com/questions/11548005/numpy-or-pandas-keeping-array-type-as-integer-while-having-a-nan-value
     # Datetime columns are first assigned a string and then a date_parser is used
     # Parquet file will retain column datatypes as assigned in Pandas DataFrame
 
-            df = pd.read_csv(src_file) 
-                            # parse_dates=date_columns_for_parsing,
-                            # date_parser=pd.to_datetime)
-            parquet_file_name = src_file.replace('.csv.gz', '.parquet').split('/')[-1]
-            df.to_parquet(src_file.replace('.csv.gz', '.parquet'))
+            table = pa_csv.read_csv(src_file)
+            # Extract a parquet filename from src_file that is a path
+            if src_file.endswith('gz'):
+                parquet_file_name = src_file.replace('.csv.gz', '.parquet').split('/')[-1]
+            else:
+                parquet_file_name = src_file.replace('.csv', '.parquet').split('/')[-1]
+                
+            pa_parquet.write_table(table, parquet_file_name)
+            
             return parquet_file_name
 
         # We have assigned a decorated task to a variable in order to add arguments
-        format_to_parquet = format_to_parquet_func(src_file=f"{PATH_TO_LOCAL_HOME}/{download_filename_prefix}")
+        format_to_parquet = format_to_parquet(src_file=f"{PATH_TO_LOCAL_HOME}/{download_filename_prefix}")
 
         @task(task_id='upload_to_gcs')
         # NOTE: takes 20 mins, at an upload speed of 800kbps. Faster if your internet has a better upload speed
-        def upload_to_gcs_func(bucket, object_name, local_file):
+        def upload_to_gcs(bucket, object_name, local_file):
             """
             Ref: https://cloud.google.com/storage/docs/uploading-objects#storage-upload-object-python
             :param bucket: GCS bucket name
@@ -96,8 +101,8 @@ def dag_template(
             blob = bucket.blob(object_name)
             blob.upload_from_filename(local_file)
 
-        # format_to_parquet variable is the returned string from decorated task format_to_parquet_func
-        upload_to_gcs = upload_to_gcs_func(bucket=BUCKET,
+        # format_to_parquet variable is the returned string from decorated task format_to_parquet
+        upload_to_gcs = upload_to_gcs(bucket=BUCKET,
                                         object_name=f"{gcs_path_template}{format_to_parquet}",
                                         local_file=f"{PATH_TO_LOCAL_HOME}/{format_to_parquet}",)
 
