@@ -48,6 +48,16 @@ def create_table_dag():
             SELECT * FROM {BIGQUERY_DATASET}.ext_{table_name};
                     
         '''
+        elif table_name == 'green_tripdata':
+            SQL = f'''
+            
+                CREATE OR REPLACE TABLE {BIGQUERY_DATASET}.{table_name}
+                PARTITION BY {TABLE_NAME_GCS_PATH_PART_MAPPING['partitions'][table_name]}
+                CLUSTER BY {TABLE_NAME_GCS_PATH_PART_MAPPING['clusters'][table_name]} AS
+                SELECT * EXCEPT (ehail_fee) FROM {BIGQUERY_DATASET}.ext_{table_name}
+                JOIN (SELECT CAST(0 as numeric) as ehail_fee FROM (SELECT SESSION_USER())) ON 1=1;
+                        
+            '''          
         else:
             SQL = f'''
             
