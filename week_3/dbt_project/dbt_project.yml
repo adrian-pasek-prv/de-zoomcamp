@@ -38,4 +38,9 @@ models:
       materialized: view
     core:
       materialized: table
-    
+
+seeds:
+  taxi_rides_ny:
+    taxi_zone_lookup:
+      +column_types:
+        locationid: numeric
