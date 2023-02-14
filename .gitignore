@@ -138,3 +138,6 @@ dmypy.json
 
 # Airflow logs
 logs/
+
+# Don't ignore dbt seed files (*.csv)
+!week_3/dbt_project/seeds/*.csv
