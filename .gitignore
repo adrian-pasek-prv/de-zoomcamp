@@ -141,3 +141,8 @@ logs/
 
 # Don't ignore dbt seed files (*.csv)
 !week_3/dbt_project/seeds/*.csv
+
+# Spark files
+_SUCCESS
+*.crc
+*.parquet
